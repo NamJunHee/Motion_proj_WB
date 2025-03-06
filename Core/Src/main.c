@@ -193,9 +193,9 @@ static void MX_TIM2_Init(void);
 static void MX_RF_Init(void);
 
 //magcal.c
-static void fUpdateCalibration4INV(MagCalibration_t *MagCal);
-static void fUpdateCalibration7EIG(MagCalibration_t *MagCal);
-static void fUpdateCalibration10EIG(MagCalibration_t *MagCal);
+//static void fUpdateCalibration4INV(MagCalibration_t *MagCal);
+//static void fUpdateCalibration7EIG(MagCalibration_t *MagCal);
+//static void fUpdateCalibration10EIG(MagCalibration_t *MagCal);
 
 /* USER CODE BEGIN PFP */
 
