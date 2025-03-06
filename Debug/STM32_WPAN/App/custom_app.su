@@ -1,0 +1,7 @@
+../STM32_WPAN/App/custom_app.c:84:6:myTask_IMU	4	static
+../STM32_WPAN/App/custom_app.c:92:6:myTask_BLE	32	static
+../STM32_WPAN/App/custom_app.c:144:6:Custom_STM_App_Notification	16	static
+../STM32_WPAN/App/custom_app.c:192:6:Custom_APP_Notification	16	static
+../STM32_WPAN/App/custom_app.c:229:6:Custom_APP_Init	4	static
+../STM32_WPAN/App/custom_app.c:248:13:Custom_Mycharnotify_Update_Char	16	static
+../STM32_WPAN/App/custom_app.c:267:6:Custom_Mycharnotify_Send_Notification	16	static
