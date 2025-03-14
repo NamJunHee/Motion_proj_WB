@@ -26,60 +26,6 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define LSM9DS1_ADDR (0x6A << 1)
-#define MAG_ADDR 	 (0x1E << 1)
-
-#define WHO_AM_I_REG 0x0F
-
-#define CTRL_REG1_G  0x10
-#define CTRL_REG3_G  0x12
-
-#define CTRL_REG5_XL 0x1F
-#define CTRL_REG6_XL 0x20
-#define CTRL_REG7_XL 0x21
-
-#define CTRL_REG1_M  0x20
-#define CTRL_REG3_M  0x22
-#define CTRL_REG4_M  0x23
-
-#define CTRL_REG4_G  0x1E
-#define CTRL_REG7_G  0x16
-#define CTRL_REG8    0x22
-#define CTRL_REG9    0x23
-//#define FIFO_CTRL    0x2E
-
-#define OUT_X_G      0x18
-#define OUT_X_XL     0x28
-#define OUT_X_M      0x28
-
-#define OUT_X_L_G    0x18
-#define OUT_X_H_G    0x19
-#define OUT_Y_L_G    0x1A
-#define OUT_Y_H_G    0x1B
-#define OUT_Z_L_G    0x1C
-#define OUT_Z_H_G    0x1D
-
-#define ACCEL_SENSITIVITY_2G 61.0f
-#define MAG_SENSITIVITY_4GAUSS 0.14f
-#define GYRO_SENSITIVITY_245DPS 8.75f
-
-#define betaDef 0.5f
-
-///magcal.c
-#define FXOS8700_UTPERCOUNT  0.1f
-#define DEFAULTB 50.0F				// default geomagnetic field (uT)
-#define X 0                         // vector components
-#define Y 1
-#define Z 2
-#define ONETHIRD 0.33333333F        // one third
-#define ONESIXTH 0.166666667F       // one sixth
-#define MINMEASUREMENTS4CAL 40      // minimum number of measurements for 4 element calibration
-#define MINMEASUREMENTS7CAL 100     // minimum number of measurements for 7 element calibration
-#define MINMEASUREMENTS10CAL 150    // minimum number of measurements for 10 element calibration
-#define MINBFITUT 22.0F             // minimum geomagnetic field B (uT) for valid calibration
-#define MAXBFITUT 67.0F             // maximum geomagnetic field B (uT) for valid calibration
-#define FITERRORAGINGSECS 7200.0F   // 2 hours: time for fit error to increase (age) by e=2.718
-
 
 /* USER CODE END PTD */
 
@@ -136,22 +82,11 @@ float mag_z = 0;
 
 SensorType CurrentSensor = GYRO_SENSOR;
 
-int cnt = 0;
+int DAM_Callback_cnt = 0;
 
 int ReadGryo_cnt = 0;
 int ReadAccel_cnt = 0;
 int ReadMag_cnt = 0;
-
-int DAM_Callback_cnt = 0;
-int interrupt_cnt = 0;
-
-char i2c_state = 0;
-char dma_state = 0;
-char hal_state = 0;
-
-uint8_t who_am_i = 0;
-int who_state = 0;
-int sensor_state = 0;
 
 float recipNorm;
 float s0, s1, s2, s3;
@@ -165,6 +100,7 @@ float ax1, ay1, az1, gx1, gy1, gz1, mx1, my1, mz1, mx2, my2, mz2;
 volatile float q0 = 1.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
 float deltat = 0.0f;
 volatile float beta = betaDef;
+
 uint32_t lastUpdate = 0;
 uint32_t micro_time = 0;
 uint32_t Now = 0;
@@ -179,6 +115,21 @@ float hardIron_z = 0.49;
 float softIron_cali[3][3] = { { 1.001, 0.033, -0.006 }, { 0.033, 0.968, 0.000 },
 		{ -0.006, -0.000, 1.033 } };
 
+uint8_t magcal_flag = 1;
+MagCalibration_t magcal;
+
+float test_val = 0;
+uint16_t mag_raw[3] = {0,0,0};
+
+int32_t rawx, rawy, rawz;
+int32_t dx, dy, dz;
+float x, y, z;
+uint64_t distsq, minsum = 0xFFFFFFFFFFFFFFFFull;
+static int runcount = 0;
+int i, j, minindex = 0;
+Point_t point;
+float gaps, field, error, errormax;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -191,11 +142,6 @@ static void MX_IPCC_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_RF_Init(void);
-
-//magcal.c
-//static void fUpdateCalibration4INV(MagCalibration_t *MagCal);
-//static void fUpdateCalibration7EIG(MagCalibration_t *MagCal);
-//static void fUpdateCalibration10EIG(MagCalibration_t *MagCal);
 
 /* USER CODE BEGIN PFP */
 
@@ -396,123 +342,6 @@ void MadgwickAHRSupdate(float gx, float gy, float gz, float ax, float ay,
 	q3 *= recipNorm;
 }
 
-//nomal_power_code
-//void LSM9DS1_ReadGyro() {
-//	if (HAL_I2C_Mem_Read(&hi2c1, LSM9DS1_ADDR, OUT_X_G | 0x80,
-//	I2C_MEMADD_SIZE_8BIT, gyro_buffer, 6, HAL_MAX_DELAY) == HAL_OK) {
-//		gyroX = (int16_t) ((gyro_buffer[1] << 8) | gyro_buffer[0]);
-//		gyroY = (int16_t) ((gyro_buffer[3] << 8) | gyro_buffer[2]);
-//		gyroZ = (int16_t) ((gyro_buffer[5] << 8) | gyro_buffer[4]);
-//
-//		gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS / 1000.0f;
-//		gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS / 1000.0f;
-//		gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS / 1000.0f - 4.6;
-//
-//		if (cnt < 1000) {
-//			gyroX_sum += gyroX_current;
-//			gyroY_sum += gyroY_current;
-//			gyroZ_sum += gyroZ_current;
-//		}
-//		if (cnt > 1000) {
-//			gyroX_avg = gyroX_sum / 1000.0f;
-//			gyroY_avg = gyroY_sum / 1000.0f;
-//			gyroZ_avg = gyroZ_sum / 1000.0f;
-//		}
-//
-//		gyro_x = gyroX_current - gyroX_avg;
-//		gyro_y = gyroY_current - gyroY_avg;
-//		gyro_z = gyroZ_current - gyroZ_avg;
-//
-//		gxyz[0] = gx1;
-//		gxyz[1] = gy1;
-//		gxyz[2] = gz1;
-//
-//	} else {
-//		gyroX = gyroY = gyroZ = 0;
-//	}
-//}
-//
-//void LSM9DS1_ReadAccel() {
-//	if (HAL_I2C_Mem_Read(&hi2c1, LSM9DS1_ADDR, OUT_X_XL | 0x80,
-//	I2C_MEMADD_SIZE_8BIT, accel_buffer, 6, HAL_MAX_DELAY) == HAL_OK) {
-//		accelX = (int16_t) ((accel_buffer[1] << 8) | accel_buffer[0]);
-//		accelY = (int16_t) ((accel_buffer[3] << 8) | accel_buffer[2]);
-//		accelZ = (int16_t) ((accel_buffer[5] << 8) | accel_buffer[4]);
-//
-//		accel_x = accelX * ACCEL_SENSITIVITY_2G / 100000;
-//		accel_y = accelY * ACCEL_SENSITIVITY_2G / 100000;
-//		accel_z = accelZ * ACCEL_SENSITIVITY_2G / 100000;
-//
-//		axyz[0] = accel_x;
-//		axyz[1] = accel_y;
-//		axyz[2] = accel_z;
-//
-//		axyz2[0] = axyz[0];
-//		axyz2[1] = axyz[1];
-//		axyz2[2] = axyz[2];
-//
-//		axyz[0] = axyz[0] * 1 / 9.8;
-//		axyz[1] = axyz[1] * 1 / 9.8;
-//		axyz[2] = axyz[2] * 1 / 9.8;
-//
-//		vector_normalize(axyz);
-//
-//	} else {
-//		accelX = accelY = accelZ = 0;
-//	}
-//}
-//
-//void LSM9DS1_ReadMag() {
-//	if (HAL_I2C_Mem_Read(&hi2c1, MAG_ADDR, OUT_X_M | 0x80, I2C_MEMADD_SIZE_8BIT,
-//			mag_buffer, 6, HAL_MAX_DELAY) == HAL_OK) {
-//		magX = (int16_t) ((mag_buffer[1] << 8) | mag_buffer[0]);
-//		magY = (int16_t) ((mag_buffer[3] << 8) | mag_buffer[2]);
-//		magZ = (int16_t) ((mag_buffer[5] << 8) | mag_buffer[4]);
-//
-//		mag_x = magX * MAG_SENSITIVITY_4GAUSS / 1000;
-//		mag_y = magY * MAG_SENSITIVITY_4GAUSS / 1000;
-//		mag_z = magZ * MAG_SENSITIVITY_4GAUSS / 1000;
-//
-//		mx1 = mag_x - hardIron_x;
-//		my1 = mag_y - hardIron_y;
-//		mz1 = mag_z - hardIron_z;
-//
-//		float corrected_V[] = { mx1, my1, mz1 };
-//
-//		result_V[0] = corrected_V[0] * softIron_cali[0][0]
-//				+ corrected_V[1] * softIron_cali[0][1]
-//				+ corrected_V[2] * softIron_cali[0][2];
-//		result_V[1] = corrected_V[0] * softIron_cali[1][0]
-//				+ corrected_V[1] * softIron_cali[1][1]
-//				+ corrected_V[2] * softIron_cali[1][2];
-//		result_V[2] = corrected_V[0] * softIron_cali[2][0]
-//				+ corrected_V[1] * softIron_cali[2][1]
-//				+ corrected_V[2] * softIron_cali[2][2];
-//
-//		mx2 = result_V[0];
-//		my2 = result_V[1];
-//		mz2 = result_V[2];
-//		mxyz[0] = mx2;
-//		mxyz[1] = my2;
-//		mxyz[2] = mz2;
-//
-//		vector_normalize(mxyz);
-//
-//		axyz1[0] = -axyz[0];
-//		gxyz1[0] = -gxyz[0];
-//
-//		Now = micros();
-//		deltat = (Now - lastUpdate) * 1.5e-4;
-//		lastUpdate = Now;
-//
-//		MadgwickAHRSupdate(gxyz1[0], gxyz[1], gxyz[2], axyz1[0], axyz[1],
-//				axyz[2], mxyz[0], mxyz[1], mxyz[2]);
-//
-//	} else {
-//		magX = magY = magZ = 0;
-//	}
-//}
-
 //low_power_code
 void LSM9DS1_ReadGyro_DMA(void) {
 	HAL_I2C_Mem_Read_DMA(&hi2c1, LSM9DS1_ADDR, OUT_X_G | 0x80,
@@ -527,6 +356,111 @@ void LSM9DS1_ReadAccel_DMA(void) {
 void LSM9DS1_ReadMag_DMA(void) {
 	HAL_I2C_Mem_Read_DMA(&hi2c1, MAG_ADDR, OUT_X_M | 0x80, I2C_MEMADD_SIZE_8BIT,
 			mag_buffer, 6);
+}
+
+void magcal_Init(void) {
+	memset(&magcal, 0, sizeof(magcal));
+	magcal.V[2] = 80.0f;
+	magcal.invW[0][0] = 1.0f;
+	magcal.invW[1][1] = 1.0f;
+	magcal.invW[2][2] = 1.0f;
+	magcal.FitError = 100.0f;
+	magcal.FitErrorAge = 100.0f;
+	magcal.B = 50.0f;
+}
+
+static int choose_discard_magcal(void) {
+
+	// When enough data is collected (gaps error is low), assume we
+	// have a pretty good coverage and the field stregth is known.
+	gaps = quality_surface_gap_error();
+	if (gaps < 25.0f)
+	{
+		// occasionally look for points farthest from average field strength
+		// always rate limit assumption-based data purging, but allow the
+		// rate to increase as the angular coverage improves.
+		if (gaps < 1.0f)
+			gaps = 1.0f;
+		if (++runcount > (int) (gaps * 10.0f))
+		{
+			j = MAGBUFFSIZE;
+			errormax = 0.0f;
+			for (i = 0; i < MAGBUFFSIZE; i++)
+			{
+				rawx = magcal.BpFast[0][i];
+				rawy = magcal.BpFast[1][i];
+				rawz = magcal.BpFast[2][i];
+//				apply_calibration(rawx, rawy, rawz, &point);
+				x = point.x;
+				y = point.y;
+				z = point.z;
+				field = sqrtf(x * x + y * y + z * z);
+				// if magcal.B is bad, things could go horribly wrong
+				error = fabsf(field - magcal.B);
+				if (error > errormax) {
+					errormax = error;
+					j = i;
+				}
+			}
+			runcount = 0;
+			if (j < MAGBUFFSIZE)
+			{
+				//printf("worst error at %d\n", j);
+				return j;
+			}
+		}
+	}
+	else
+	{
+		runcount = 0;
+	}
+
+	for (i = 0; i < MAGBUFFSIZE; i++)
+	{
+		for (j = i + 1; j < MAGBUFFSIZE; j++) {
+			dx = magcal.BpFast[0][i] - magcal.BpFast[0][j];
+			dy = magcal.BpFast[1][i] - magcal.BpFast[1][j];
+			dz = magcal.BpFast[2][i] - magcal.BpFast[2][j];
+			distsq = (int64_t) dx * (int64_t) dx;
+			distsq += (int64_t) dy * (int64_t) dy;
+			distsq += (int64_t) dz * (int64_t) dz;
+			if (distsq < minsum) {
+				minsum = distsq;
+				minindex = (random() & 1) ? i : j;
+			}
+		}
+	}
+	return minindex;
+}
+
+static void add_magcal_data(const int16_t *data) {
+
+	int i;
+
+	// first look for an unused caldata slot
+	for (i = 0; i < MAGBUFFSIZE; i++) {
+		if (!magcal.valid[i])
+			break;
+	}
+
+	if (i >= MAGBUFFSIZE) {
+		i = choose_discard_magcal();
+		if (i < 0 || i >= MAGBUFFSIZE) {
+			i = random() % MAGBUFFSIZE;
+		}
+	}
+	// add it to the cal buffer
+	magcal.BpFast[0][i] = data[0];
+	magcal.BpFast[1][i] = data[1];
+	magcal.BpFast[2][i] = data[2];
+	magcal.valid[i] = 1;
+}
+
+void process_imu_data(int16_t raw_magX, int16_t raw_magY, int16_t raw_magZ) {
+	mag_raw[0] = raw_magX;
+	mag_raw[1] = raw_magY;
+	mag_raw[2] = raw_magZ;
+	add_magcal_data(mag_raw);
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
@@ -589,51 +523,58 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 
 			CurrentSensor = MAG_SENSOR;
 			LSM9DS1_ReadMag_DMA();
+
 		} else if (CurrentSensor == MAG_SENSOR) {
 			magX = (int16_t) ((mag_buffer[1] << 8) | mag_buffer[0]);
 			magY = (int16_t) ((mag_buffer[3] << 8) | mag_buffer[2]);
 			magZ = (int16_t) ((mag_buffer[5] << 8) | mag_buffer[4]);
 
-			mag_x = magX * MAG_SENSITIVITY_4GAUSS / 1000;
-			mag_y = magY * MAG_SENSITIVITY_4GAUSS / 1000;
-			mag_z = magZ * MAG_SENSITIVITY_4GAUSS / 1000;
+			if (magcal_flag == 1) {
+				//magcal algorithm
+				process_imu_data(magX, magY, magZ);
+				MagCal_Run();
 
-			mx1 = mag_x - hardIron_x;
-			my1 = mag_y - hardIron_y;
-			mz1 = mag_z - hardIron_z;
+			} else {
+				mag_x = magX * MAG_SENSITIVITY_4GAUSS / 1000;
+				mag_y = magY * MAG_SENSITIVITY_4GAUSS / 1000;
+				mag_z = magZ * MAG_SENSITIVITY_4GAUSS / 1000;
 
-			float corrected_V[] = { mx1, my1, mz1 };
+				mx1 = mag_x - hardIron_x;
+				my1 = mag_y - hardIron_y;
+				mz1 = mag_z - hardIron_z;
 
-			result_V[0] = corrected_V[0] * softIron_cali[0][0]
-					+ corrected_V[1] * softIron_cali[0][1]
-					+ corrected_V[2] * softIron_cali[0][2];
-			result_V[1] = corrected_V[0] * softIron_cali[1][0]
-					+ corrected_V[1] * softIron_cali[1][1]
-					+ corrected_V[2] * softIron_cali[1][2];
-			result_V[2] = corrected_V[0] * softIron_cali[2][0]
-					+ corrected_V[1] * softIron_cali[2][1]
-					+ corrected_V[2] * softIron_cali[2][2];
+				float corrected_V[] = { mx1, my1, mz1 };
 
-			mx2 = result_V[0];
-			my2 = result_V[1];
-			mz2 = result_V[2];
-			mxyz[0] = mx2;
-			mxyz[1] = my2;
-			mxyz[2] = mz2;
+				result_V[0] = corrected_V[0] * softIron_cali[0][0]
+						+ corrected_V[1] * softIron_cali[0][1]
+						+ corrected_V[2] * softIron_cali[0][2];
+				result_V[1] = corrected_V[0] * softIron_cali[1][0]
+						+ corrected_V[1] * softIron_cali[1][1]
+						+ corrected_V[2] * softIron_cali[1][2];
+				result_V[2] = corrected_V[0] * softIron_cali[2][0]
+						+ corrected_V[1] * softIron_cali[2][1]
+						+ corrected_V[2] * softIron_cali[2][2];
 
-			vector_normalize(mxyz);
+				mx2 = result_V[0];
+				my2 = result_V[1];
+				mz2 = result_V[2];
+				mxyz[0] = mx2;
+				mxyz[1] = my2;
+				mxyz[2] = mz2;
 
-			axyz1[0] = -axyz[0];
-			gxyz1[0] = -gxyz[0];
+				vector_normalize(mxyz);
 
-			Now = micros();
-			deltat = (Now - lastUpdate) * 1.5e-4;
-			lastUpdate = Now;
+				axyz1[0] = -axyz[0];
+				gxyz1[0] = -gxyz[0];
 
-			MadgwickAHRSupdate(gxyz1[0], gxyz[1], gxyz[2], axyz1[0], axyz[1],
-					axyz[2], mxyz[0], mxyz[1], mxyz[2]);
+				Now = micros();
+				deltat = (Now - lastUpdate) * 1.5e-4;
+				lastUpdate = Now;
 
-			UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_BLE, CFG_SCH_PRIO_0);
+				MadgwickAHRSupdate(gxyz1[0], gxyz[1], gxyz[2], axyz1[0],
+						axyz[1], axyz[2], mxyz[0], mxyz[1], mxyz[2]);
+				UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_BLE, CFG_SCH_PRIO_0);
+			}
 
 			CurrentSensor = GYRO_SENSOR;
 		}
@@ -646,6 +587,7 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
  * @brief  The application entry point.
  * @retval int
  */
+
 int main(void) {
 
 	/* USER CODE BEGIN 1 */
@@ -697,17 +639,14 @@ int main(void) {
 
 	HAL_TIM_Base_Start(&htim2);
 
+	magcal_Init();
+
 	while (1) {
-		cnt = cnt + 1;
 
 		/* USER CODE END WHILE */
 		MX_APPE_Process();
 
 		/* USER CODE BEGIN 3 */
-
-		//nomal_power_code
-//		UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_IMU, CFG_SCH_PRIO_0);
-//		UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_BLE, CFG_SCH_PRIO_0);
 
 		//low_power_code
 		LSM9DS1_ReadGyro_DMA();

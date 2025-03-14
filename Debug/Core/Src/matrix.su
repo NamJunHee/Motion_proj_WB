@@ -1,0 +1,10 @@
+../Core/Src/matrix.c:48:6:f3x3matrixAeqI	24	static
+../Core/Src/matrix.c:64:6:fmatrixAeqI	24	static
+../Core/Src/matrix.c:82:6:f3x3matrixAeqScalar	24	static
+../Core/Src/matrix.c:97:6:f3x3matrixAeqAxScalar	24	static
+../Core/Src/matrix.c:112:6:f3x3matrixAeqMinusA	24	static
+../Core/Src/matrix.c:129:6:f3x3matrixAeqInvSymB	32	static
+../Core/Src/matrix.c:160:7:f3x3matrixDetA	16	static
+../Core/Src/matrix.c:173:6:eigencompute	64	static
+../Core/Src/matrix.c:300:6:fmatrixAeqInvA	48	static
+../Core/Src/matrix.c:412:6:fmatrixAeqRenormRotA	24	static
