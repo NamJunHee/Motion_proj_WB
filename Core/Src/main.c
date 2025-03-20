@@ -130,6 +130,7 @@ int i, j, minindex = 0;
 Point_t point;
 float gaps, field, error, errormax;
 
+int choose_flag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -370,7 +371,7 @@ void magcal_Init(void) {
 }
 
 static int choose_discard_magcal(void) {
-
+	choose_flag = 1;
 	// When enough data is collected (gaps error is low), assume we
 	// have a pretty good coverage and the field stregth is known.
 	gaps = quality_surface_gap_error();
@@ -449,6 +450,7 @@ static void add_magcal_data(const int16_t *data) {
 			i = random() % MAGBUFFSIZE;
 		}
 	}
+
 	// add it to the cal buffer
 	magcal.BpFast[0][i] = data[0];
 	magcal.BpFast[1][i] = data[1];

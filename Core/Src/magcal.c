@@ -24,6 +24,9 @@ static void fUpdateCalibration4INV(MagCalibration_t *MagCal);
 static void fUpdateCalibration7EIG(MagCalibration_t *MagCal);
 static void fUpdateCalibration10EIG(MagCalibration_t *MagCal);
 
+int magcal_type = 0;
+int magcal_cnt = 0;
+
 int MagCal_Run(void)
 {
 	int i, j;			// loop counters
@@ -39,6 +42,8 @@ int MagCal_Run(void)
 	for (i=0; i < MAGBUFFSIZE; i++) {
 		if (magcal.valid[i]) count++;
 	}
+
+	magcal_cnt = count;
 
 	if (count < MINMEASUREMENTS4CAL) return 0;
 
@@ -117,6 +122,7 @@ static void fUpdateCalibration4INV(MagCalibration_t *MagCal)
 	int8_t iRowInd[4];
 	int8_t iPivot[4];
 
+	magcal_type = 1;
 	// compute fscaling to reduce multiplications later
 	fscaling = FXOS8700_UTPERCOUNT / DEFAULTB;
 
@@ -269,6 +275,8 @@ static void fUpdateCalibration7EIG(MagCalibration_t *MagCal)
 	int16_t iCount;				// number of measurements counted
 	int i, j, k, m, n;			// loop counters
 
+	magcal_type = 2;
+
 	// compute fscaling to reduce multiplications later
 	fscaling = FXOS8700_UTPERCOUNT / DEFAULTB;
 
@@ -396,6 +404,8 @@ static void fUpdateCalibration10EIG(MagCalibration_t *MagCal)
 	int16_t iOffset[3];			// offset to remove large DC hard iron bias in matrix
 	int16_t iCount;				// number of measurements counted
 	int i, j, k, m, n;			// loop counters
+
+	magcal_type = 3;
 
 	// compute fscaling to reduce multiplications later
 	fscaling = FXOS8700_UTPERCOUNT / DEFAULTB;

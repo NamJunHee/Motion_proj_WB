@@ -23,6 +23,8 @@ static int quality_gaps_computed=0;
 static int quality_variance_computed=0;
 static int quality_wobble_computed=0;
 
+int gap_fuc_flag;
+int gap_fuc_spheredist;
 
 // How many surface gaps
 float quality_surface_gap_error(void)
@@ -30,9 +32,11 @@ float quality_surface_gap_error(void)
 	float error=0.0f;
 	int i, num;
 
+	gap_fuc_flag = 1;
 	if (quality_gaps_computed) return quality_gaps_buffer;
 	for (i=0; i < 100; i++) {
 		num = spheredist[i];
+		gap_fuc_spheredist = num;
 		if (num == 0) {
 			error += 1.0f;
 		} else if (num == 1) {

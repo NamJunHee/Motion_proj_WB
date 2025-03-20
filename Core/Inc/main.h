@@ -76,6 +76,7 @@ typedef enum{
 	ACCEL_SENSOR,
 	MAG_SENSOR
 }SensorType;
+
 extern SensorType CurrentSensor;
 
 typedef struct {
@@ -124,6 +125,8 @@ extern void f3x3matrixAeqInvSymB(float A[][3], float B[][3]);
 extern float f3x3matrixDetA(float A[][3]);
 extern void fmatrixAeqInvA(float *A[], int8_t iColInd[], int8_t iRowInd[], int8_t iPivot[], int8_t isize);
 extern void fmatrixAeqRenormRotA(float A[][3]);
+
+extern int magcal_type;
 
 
 /* USER CODE END ET */

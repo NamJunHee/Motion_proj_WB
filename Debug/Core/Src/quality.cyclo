@@ -1,4 +1,4 @@
-../Core/Src/quality.c:28:7:quality_surface_gap_error	6
-../Core/Src/quality.c:50:7:quality_magnitude_variance_error	4
-../Core/Src/quality.c:73:7:quality_wobble_error	6
-../Core/Src/quality.c:116:7:quality_spherical_fit_error	1
+../Core/Src/quality.c:30:7:quality_surface_gap_error	6
+../Core/Src/quality.c:54:7:quality_magnitude_variance_error	4
+../Core/Src/quality.c:77:7:quality_wobble_error	6
+../Core/Src/quality.c:120:7:quality_spherical_fit_error	1
