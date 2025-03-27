@@ -370,6 +370,21 @@ void magcal_Init(void) {
 	magcal.B = 50.0f;
 }
 
+static int chunk_i = 0;
+static int chunk_j = 0;
+
+void apply_calibration(int16_t rawx, int16_t rawy, int16_t rawz, Point_t *out)
+{
+	float x, y, z;
+
+	x = ((float)rawx * UT_PER_COUNT) - magcal.V[0];
+	y = ((float)rawy * UT_PER_COUNT) - magcal.V[1];
+	z = ((float)rawz * UT_PER_COUNT) - magcal.V[2];
+	out->x = x * magcal.invW[0][0] + y * magcal.invW[0][1] + z * magcal.invW[0][2];
+	out->y = x * magcal.invW[1][0] + y * magcal.invW[1][1] + z * magcal.invW[1][2];
+	out->z = x * magcal.invW[2][0] + y * magcal.invW[2][1] + z * magcal.invW[2][2];
+}
+
 static int choose_discard_magcal(void) {
 	choose_flag = 1;
 	// When enough data is collected (gaps error is low), assume we
@@ -416,21 +431,50 @@ static int choose_discard_magcal(void) {
 		runcount = 0;
 	}
 
-	for (i = 0; i < MAGBUFFSIZE; i++)
-	{
-		for (j = i + 1; j < MAGBUFFSIZE; j++) {
-			dx = magcal.BpFast[0][i] - magcal.BpFast[0][j];
-			dy = magcal.BpFast[1][i] - magcal.BpFast[1][j];
-			dz = magcal.BpFast[2][i] - magcal.BpFast[2][j];
-			distsq = (int64_t) dx * (int64_t) dx;
-			distsq += (int64_t) dy * (int64_t) dy;
-			distsq += (int64_t) dz * (int64_t) dz;
-			if (distsq < minsum) {
-				minsum = distsq;
-				minindex = (random() & 1) ? i : j;
-			}
-		}
-	}
+//	for (i = 0; i < MAGBUFFSIZE; i++)
+//	{
+//		for (j = i + 1; j < MAGBUFFSIZE; j++) {
+//			dx = magcal.BpFast[0][i] - magcal.BpFast[0][j];
+//			dy = magcal.BpFast[1][i] - magcal.BpFast[1][j];
+//			dz = magcal.BpFast[2][i] - magcal.BpFast[2][j];
+//			distsq = (int64_t) dx * (int64_t) dx;
+//			distsq += (int64_t) dy * (int64_t) dy;
+//			distsq += (int64_t) dz * (int64_t) dz;
+//			if (distsq < minsum) {
+//				minsum = distsq;
+//				minindex = (random() & 1) ? i : j;
+//			}
+//		}
+//	}
+
+	for (int cnt = 0; cnt < 10; cnt++) {
+	        if (chunk_i >= MAGBUFFSIZE) {
+	            chunk_i = 0;
+	            chunk_j = 0;
+	            break;
+	        }
+
+	        if (chunk_j >= MAGBUFFSIZE) {
+	            chunk_i++;
+	            chunk_j = chunk_i + 1;
+	            continue;
+	        }
+
+	        dx = magcal.BpFast[0][chunk_i] - magcal.BpFast[0][chunk_j];
+	        dy = magcal.BpFast[1][chunk_i] - magcal.BpFast[1][chunk_j];
+	        dz = magcal.BpFast[2][chunk_i] - magcal.BpFast[2][chunk_j];
+	        distsq = (int64_t) dx * (int64_t) dx +
+	                 (int64_t) dy * (int64_t) dy +
+	                 (int64_t) dz * (int64_t) dz;
+
+	        if (distsq < minsum) {
+	            minsum = distsq;
+	            minindex = (random() & 1) ? chunk_i : chunk_j;
+	        }
+
+	        chunk_j++;
+	    }
+
 	return minindex;
 }
 
@@ -534,7 +578,22 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			if (magcal_flag == 1) {
 				//magcal algorithm
 				process_imu_data(magX, magY, magZ);
+
 				MagCal_Run();
+
+				for (i=0; i < MAGBUFFSIZE; i++) {
+					if (magcal.valid[i]) {
+
+						apply_calibration(magcal.BpFast[0][i], magcal.BpFast[1][i],
+											magcal.BpFast[2][i], &point);
+						quality_update(&point);
+
+						if(magcal.FitError < 2.0)
+						{
+							magcal_flag = 0;
+						}
+					}
+				}
 
 			} else {
 				mag_x = magX * MAG_SENSITIVITY_4GAUSS / 1000;

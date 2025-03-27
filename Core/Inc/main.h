@@ -109,12 +109,15 @@ typedef struct {
 	float z;
 	//int valid;
 } Point_t;
-
+extern Point_t point;
 
 extern int interrupt_cnt;
+
+extern void quality_reset(void);
+extern void quality_update(const Point_t *point);
 extern int MagCal_Run(void);
 extern float quality_surface_gap_error(void);
-extern void apply_calibration(int16_t rawx, int16_t rawy, int16_t rawz, Point_t *out);
+//extern void apply_calibration(int16_t rawx, int16_t rawy, int16_t rawz, Point_t *out);
 
 extern void f3x3matrixAeqI(float A[][3]);
 extern void fmatrixAeqI(float *A[], int16_t rc);

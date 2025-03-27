@@ -2,4 +2,3 @@
 ../Core/Src/magcal.c:109:13:fUpdateCalibration4INV	20
 ../Core/Src/magcal.c:269:13:fUpdateCalibration7EIG	19
 ../Core/Src/magcal.c:399:13:fUpdateCalibration10EIG	26
-../Core/Src/magcal.c:586:6:apply_calibration	1

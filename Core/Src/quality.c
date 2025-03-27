@@ -23,20 +23,141 @@ static int quality_gaps_computed=0;
 static int quality_variance_computed=0;
 static int quality_wobble_computed=0;
 
-int gap_fuc_flag;
-int gap_fuc_spheredist;
+//int gap_fuc_flag;
+//int gap_fuc_spheredist;
+
+static int sphere_region(float x, float y, float z)
+{
+	float latitude, longitude;
+	int region;
+
+	//if (pr) printf("  region %.1f,%.1f,%.1f  ", x, y, z);
+
+	// longitude = 0 to 2pi  (meaning 0 to 360 degrees)
+	longitude = atan2f(y, x) + (float)M_PI;
+	// latitude = -pi/2 to +pi/2  (meaning -90 to +90 degrees)
+	latitude = (float)(M_PI / 2.0) - atan2f(sqrtf(x * x + y * y), z);
+
+	//if (pr) printf("   lat=%.1f", latitude * (float)(180.0 / M_PI));
+	//if (pr) printf(",lon=%.1f  ", longitude * (float)(180.0 / M_PI));
+
+	// https://etna.mcs.kent.edu/vol.25.2006/pp309-327.dir/pp309-327.html
+	// sphere equations....
+	//  area of unit sphere = 4*pi
+	//  area of unit sphere cap = 2*pi*h  h = cap height
+	//  lattitude of unit sphere cap = arcsin(1 - h)
+	if (latitude > 1.37046f /* 78.52 deg */) {
+		// arctic cap, 1 region
+		region = 0;
+	} else if (latitude < -1.37046f /* -78.52 deg */) {
+		// antarctic cap, 1 region
+		region = 99;
+	} else if (latitude > 0.74776f /* 42.84 deg */ || latitude < -0.74776f ) {
+		// temperate zones, 15 regions each
+		region = floorf(longitude * (float)(15.0 / (M_PI * 2.0)));
+		if (region < 0) region = 0;
+		else if (region > 14) region = 14;
+		if (latitude > 0.0) {
+			region += 1; // 1 to 15
+		} else {
+			region += 84; // 84 to 98
+		}
+	} else {
+		// tropic zones, 34 regions each
+		region = floorf(longitude * (float)(34.0 / (M_PI * 2.0)));
+		if (region < 0) region = 0;
+		else if (region > 33) region = 33;
+		if (latitude >= 0.0) {
+			region += 16; // 16 to 49
+		} else {
+			region += 50; // 50 to 83
+		}
+	}
+	//if (pr) printf("  %d\n", region);
+	return region;
+}
+
+void quality_reset(void)
+{
+	float longitude;
+	int i;
+
+	count=0;
+	memset(spheredist, 0, sizeof(spheredist));
+	memset(spheredata, 0, sizeof(spheredata));
+	if (!sphereideal_initialized) {
+		sphereideal[0].x = 0.0f;
+		sphereideal[0].y = 0.0f;
+		sphereideal[0].z = 1.0f;
+		for (i=1; i <= 15; i++) {
+			longitude = ((float)(i - 1) + 0.5f) * (M_PI * 2.0 / 15.0);
+			sphereideal[i].x = cosf(longitude) * cosf(1.05911) * -1.0f;
+			sphereideal[i].y = sinf(longitude) * cosf(1.05911) * -1.0f;
+			sphereideal[i].z = sinf(1.05911);
+		}
+		for (i=16; i <= 49; i++) {
+			longitude = ((float)(i - 16) + 0.5f) * (M_PI * 2.0 / 34.0);
+			sphereideal[i].x = cosf(longitude) * cos(0.37388) * -1.0f;
+			sphereideal[i].y = sinf(longitude) * cos(0.37388) * -1.0f;
+			sphereideal[i].z = sinf(0.37388);
+		}
+		for (i=50; i <= 83; i++) {
+			longitude = ((float)(i - 50) + 0.5f) * (M_PI * 2.0 / 34.0);
+			sphereideal[i].x = cosf(longitude) * cos(0.37388) * -1.0f;
+			sphereideal[i].y = sinf(longitude) * cos(0.37388) * -1.0f;
+			sphereideal[i].z = sinf(-0.37388);
+		}
+		for (i=84; i <= 98; i++) {
+			longitude = ((float)(i - 1) + 0.5f) * (M_PI * 2.0 / 15.0);
+			sphereideal[i].x = cosf(longitude) * cosf(1.05911) * -1.0f;
+			sphereideal[i].y = sinf(longitude) * cosf(1.05911) * -1.0f;
+			sphereideal[i].z = sinf(-1.05911);
+		}
+		sphereideal[99].x = 0.0f;
+		sphereideal[99].y = 0.0f;
+		sphereideal[99].z = -1.0f;
+		sphereideal_initialized = 1;
+	}
+	quality_gaps_computed = 0;
+	quality_variance_computed = 0;
+	quality_wobble_computed = 0;
+}
 
 // How many surface gaps
+void quality_update(const Point_t *point)
+{
+	if (count >= MAGBUFFSIZE)
+		count = 0;
+
+	float x, y, z;
+	int region;
+
+	x = point->x;
+	y = point->y;
+	z = point->z;
+	magnitude[count] = sqrtf(x * x + y * y + z * z);
+	region = sphere_region(x, y, z);
+	spheredist[region]++;
+	spheredata[region].x += x;
+	spheredata[region].y += y;
+	spheredata[region].z += z;
+	count++;
+	quality_gaps_computed = 0;
+	quality_variance_computed = 0;
+	quality_wobble_computed = 0;
+}
+
+
 float quality_surface_gap_error(void)
 {
 	float error=0.0f;
 	int i, num;
 
-	gap_fuc_flag = 1;
+//	gap_fuc_flag = 1;
 	if (quality_gaps_computed) return quality_gaps_buffer;
 	for (i=0; i < 100; i++) {
 		num = spheredist[i];
-		gap_fuc_spheredist = num;
+//		gap_fuc_spheredist = num;
 		if (num == 0) {
 			error += 1.0f;
 		} else if (num == 1) {

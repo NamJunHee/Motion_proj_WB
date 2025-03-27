@@ -1,4 +1,7 @@
-../Core/Src/quality.c:30:7:quality_surface_gap_error	24	static
-../Core/Src/quality.c:54:7:quality_magnitude_variance_error	32	static
-../Core/Src/quality.c:77:7:quality_wobble_error	64	static
-../Core/Src/quality.c:120:7:quality_spherical_fit_error	4	static
+../Core/Src/quality.c:29:12:sphere_region	40	static
+../Core/Src/quality.c:80:6:quality_reset	16	static
+../Core/Src/quality.c:127:6:quality_update	40	static
+../Core/Src/quality.c:151:7:quality_surface_gap_error	24	static
+../Core/Src/quality.c:175:7:quality_magnitude_variance_error	32	static
+../Core/Src/quality.c:198:7:quality_wobble_error	64	static
+../Core/Src/quality.c:241:7:quality_spherical_fit_error	4	static
