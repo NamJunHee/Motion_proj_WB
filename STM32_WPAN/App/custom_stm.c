@@ -67,7 +67,7 @@ extern uint16_t Connection_Handle;
 
 /* Private variables ---------------------------------------------------------*/
 uint16_t SizeMycharwrite = 1;
-uint16_t SizeMycharnotify = 20;
+uint16_t SizeMycharnotify = 26;
 
 /**
  * START of Section BLE_DRIVER_CONTEXT

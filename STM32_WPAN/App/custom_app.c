@@ -99,9 +99,9 @@ void myTask_BLE(void) {
 	int16_t gyro_y_int = (int16_t) (gyro_y * 1000);
 	int16_t gyro_z_int = (int16_t) (gyro_z * 1000);
 
-//	int16_t mag_x_int = (int16_t) (mag_x * 1000);
-//	int16_t mag_y_int = (int16_t) (mag_y * 1000);
-//	int16_t mag_z_int = (int16_t) (mag_z * 1000);
+	int16_t mag_x_int = (int16_t) (mag_x * 100);
+	int16_t mag_y_int = (int16_t) (mag_y * 100);
+	int16_t mag_z_int = (int16_t) (mag_z * 100);
 
 	int16_t q0_int = (int16_t) (q0 * 1000);
 	int16_t q1_int = (int16_t) (q1 * 1000);
@@ -118,7 +118,6 @@ void myTask_BLE(void) {
 	UpdateCharData[6] = (uint8_t) (gyro_x_int >> 8);
 	UpdateCharData[7] = (uint8_t) (gyro_x_int & 0xFF);
 	UpdateCharData[8] = (uint8_t) (gyro_y_int >> 8);
-
 	UpdateCharData[9] = (uint8_t) (gyro_y_int & 0xFF);
 	UpdateCharData[10] = (uint8_t) (gyro_z_int >> 8);
 	UpdateCharData[11] = (uint8_t) (gyro_z_int & 0xFF);
@@ -131,6 +130,13 @@ void myTask_BLE(void) {
 	UpdateCharData[17] = (uint8_t) (q2_int & 0xFF);
 	UpdateCharData[18] = (uint8_t) (q3_int >> 8);
 	UpdateCharData[19] = (uint8_t) (q3_int & 0xFF);
+
+	UpdateCharData[20] = (uint8_t) (mag_x_int >> 8);
+	UpdateCharData[21] = (uint8_t) (mag_x_int & 0xFF);
+	UpdateCharData[22] = (uint8_t) (mag_y_int >> 8);
+	UpdateCharData[23] = (uint8_t) (mag_y_int & 0xFF);
+	UpdateCharData[24] = (uint8_t) (mag_z_int >> 8);
+	UpdateCharData[25] = (uint8_t) (mag_z_int & 0xFF);
 
 	Custom_Mycharnotify_Update_Char();
 

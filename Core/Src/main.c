@@ -108,18 +108,27 @@ uint32_t Now = 0;
 float gxyz[3], gxyz1[3], axyz[3], axyz1[3], mxyz[3], axyz2[3];
 float result_V[3];
 
-float hardIron_x = -14.73;
-float hardIron_y = -33.35;
-float hardIron_z = 0.49;
+//float hardIron_x = -14.73;
+//float hardIron_y = -33.35;
+//float hardIron_z = 0.49;
 
-float softIron_cali[3][3] = { { 1.001, 0.033, -0.006 }, { 0.033, 0.968, 0.000 },
-		{ -0.006, -0.000, 1.033 } };
+float hardIron_x = 4.47;
+float hardIron_y = 49.71;
+float hardIron_z = 16.24;
+
+//float softIron_cali[3][3] = { { 1.001, 0.033, -0.006 }, { 0.033, 0.968, 0.000 },
+//		{ -0.006, -0.000, 1.033 } };
+
+float softIron_cali[3][3] = { { 1.601, 0.112, 0.209 }, { 0.112, 0.701, -0.154 },
+		{ 0.209, -0.154, 0.968 } };
 
 uint8_t magcal_flag = 1;
+static int magcal_counter = 0;
+
 MagCalibration_t magcal;
 
 float test_val = 0;
-uint16_t mag_raw[3] = {0,0,0};
+uint16_t mag_raw[3] = { 0, 0, 0 };
 
 int32_t rawx, rawy, rawz;
 int32_t dx, dy, dz;
@@ -128,9 +137,11 @@ uint64_t distsq, minsum = 0xFFFFFFFFFFFFFFFFull;
 static int runcount = 0;
 int i, j, minindex = 0;
 Point_t point;
-float gaps, field, error, errormax;
+float gaps = 99, field, error, errormax;
 
 int choose_flag = 0;
+const double DEG2RAD = M_PI / 180.0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -169,18 +180,24 @@ void LSM9DS1_Init() {
 	HAL_Delay(10);
 
 	//low-power setting
-//	gyro setting
-	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG1_G, 0x40); //gyro ODR 59.5 Hz(low-power mode), full scale 245dps(basic)
+	//gyro setting
+//	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG1_G, 0x40); //gyro ODR 59.5 Hz(low-power mode), full scale 245dps(basic)
+	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG1_G, 0x60); //ODR_G = 119Hz, FS = 245dps
+//	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG1_G, 0x6C); //ODR_G = 119Hz, FS = 2000dps
 	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG3_G, 0x80); //gyro low-power mode activate
 	HAL_Delay(10);
 
 	//accel setting
-	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG6_XL, 0x20); //accel ODR 10Hz, full scale 2g(basic)
+//	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG6_XL, 0x20); //accel ODR 10Hz, full scale 2g(basic)
+	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG6_XL, 0x60); // ODR_XL = 119Hz, FS = ±2g
+//	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG6_XL, 0x58); // ODR_XL = 119Hz, FS = ±4g
+//	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG6_XL, 0x68); // ODR_XL = 119Hz, FS = ±8g
 	LSM9DS1_WriteRegister(LSM9DS1_ADDR, CTRL_REG7_XL, 0x00); //accel low-power mode activate
 	HAL_Delay(10);
 
 	//mag setting
-	LSM9DS1_WriteRegister(MAG_ADDR, CTRL_REG1_M, 0x10); // mag ODR 10Hz, temp-comp activate
+//	LSM9DS1_WriteRegister(MAG_ADDR, CTRL_REG1_M, 0x10); // mag ODR 10Hz, temp-comp activate
+	LSM9DS1_WriteRegister(MAG_ADDR, CTRL_REG1_M, 0x7C); // OM = 11 (ultra-high), DO = 110 (80Hz)
 	LSM9DS1_WriteRegister(MAG_ADDR, CTRL_REG3_M, 0x00); // mag Continuous-conversion mode activate
 	HAL_Delay(10);
 
@@ -373,16 +390,18 @@ void magcal_Init(void) {
 static int chunk_i = 0;
 static int chunk_j = 0;
 
-void apply_calibration(int16_t rawx, int16_t rawy, int16_t rawz, Point_t *out)
-{
+void apply_calibration(int16_t rawx, int16_t rawy, int16_t rawz, Point_t *out) {
 	float x, y, z;
 
-	x = ((float)rawx * UT_PER_COUNT) - magcal.V[0];
-	y = ((float)rawy * UT_PER_COUNT) - magcal.V[1];
-	z = ((float)rawz * UT_PER_COUNT) - magcal.V[2];
-	out->x = x * magcal.invW[0][0] + y * magcal.invW[0][1] + z * magcal.invW[0][2];
-	out->y = x * magcal.invW[1][0] + y * magcal.invW[1][1] + z * magcal.invW[1][2];
-	out->z = x * magcal.invW[2][0] + y * magcal.invW[2][1] + z * magcal.invW[2][2];
+	x = ((float) rawx * UT_PER_COUNT) - magcal.V[0];
+	y = ((float) rawy * UT_PER_COUNT) - magcal.V[1];
+	z = ((float) rawz * UT_PER_COUNT) - magcal.V[2];
+	out->x = x * magcal.invW[0][0] + y * magcal.invW[0][1]
+			+ z * magcal.invW[0][2];
+	out->y = x * magcal.invW[1][0] + y * magcal.invW[1][1]
+			+ z * magcal.invW[1][2];
+	out->z = x * magcal.invW[2][0] + y * magcal.invW[2][1]
+			+ z * magcal.invW[2][2];
 }
 
 static int choose_discard_magcal(void) {
@@ -390,19 +409,16 @@ static int choose_discard_magcal(void) {
 	// When enough data is collected (gaps error is low), assume we
 	// have a pretty good coverage and the field stregth is known.
 	gaps = quality_surface_gap_error();
-	if (gaps < 25.0f)
-	{
+	if (gaps < 25.0f) {
 		// occasionally look for points farthest from average field strength
 		// always rate limit assumption-based data purging, but allow the
 		// rate to increase as the angular coverage improves.
 		if (gaps < 1.0f)
 			gaps = 1.0f;
-		if (++runcount > (int) (gaps * 10.0f))
-		{
+		if (++runcount > (int) (gaps * 10.0f)) {
 			j = MAGBUFFSIZE;
 			errormax = 0.0f;
-			for (i = 0; i < MAGBUFFSIZE; i++)
-			{
+			for (i = 0; i < MAGBUFFSIZE; i++) {
 				rawx = magcal.BpFast[0][i];
 				rawy = magcal.BpFast[1][i];
 				rawz = magcal.BpFast[2][i];
@@ -419,15 +435,12 @@ static int choose_discard_magcal(void) {
 				}
 			}
 			runcount = 0;
-			if (j < MAGBUFFSIZE)
-			{
+			if (j < MAGBUFFSIZE) {
 				//printf("worst error at %d\n", j);
 				return j;
 			}
 		}
-	}
-	else
-	{
+	} else {
 		runcount = 0;
 	}
 
@@ -448,32 +461,31 @@ static int choose_discard_magcal(void) {
 //	}
 
 	for (int cnt = 0; cnt < 10; cnt++) {
-	        if (chunk_i >= MAGBUFFSIZE) {
-	            chunk_i = 0;
-	            chunk_j = 0;
-	            break;
-	        }
+		if (chunk_i >= MAGBUFFSIZE) {
+			chunk_i = 0;
+			chunk_j = 0;
+			break;
+		}
 
-	        if (chunk_j >= MAGBUFFSIZE) {
-	            chunk_i++;
-	            chunk_j = chunk_i + 1;
-	            continue;
-	        }
+		if (chunk_j >= MAGBUFFSIZE) {
+			chunk_i++;
+			chunk_j = chunk_i + 1;
+			continue;
+		}
 
-	        dx = magcal.BpFast[0][chunk_i] - magcal.BpFast[0][chunk_j];
-	        dy = magcal.BpFast[1][chunk_i] - magcal.BpFast[1][chunk_j];
-	        dz = magcal.BpFast[2][chunk_i] - magcal.BpFast[2][chunk_j];
-	        distsq = (int64_t) dx * (int64_t) dx +
-	                 (int64_t) dy * (int64_t) dy +
-	                 (int64_t) dz * (int64_t) dz;
+		dx = magcal.BpFast[0][chunk_i] - magcal.BpFast[0][chunk_j];
+		dy = magcal.BpFast[1][chunk_i] - magcal.BpFast[1][chunk_j];
+		dz = magcal.BpFast[2][chunk_i] - magcal.BpFast[2][chunk_j];
+		distsq = (int64_t) dx * (int64_t) dx + (int64_t) dy * (int64_t) dy
+				+ (int64_t) dz * (int64_t) dz;
 
-	        if (distsq < minsum) {
-	            minsum = distsq;
-	            minindex = (random() & 1) ? chunk_i : chunk_j;
-	        }
+		if (distsq < minsum) {
+			minsum = distsq;
+			minindex = (random() & 1) ? chunk_i : chunk_j;
+		}
 
-	        chunk_j++;
-	    }
+		chunk_j++;
+	}
 
 	return minindex;
 }
@@ -506,7 +518,18 @@ void process_imu_data(int16_t raw_magX, int16_t raw_magY, int16_t raw_magZ) {
 	mag_raw[0] = raw_magX;
 	mag_raw[1] = raw_magY;
 	mag_raw[2] = raw_magZ;
+
 	add_magcal_data(mag_raw);
+
+	// 즉시 calibration 시도
+	static uint32_t last_cal_time = 0;
+	uint32_t current_time = HAL_GetTick();
+
+	if (current_time - last_cal_time >= 50) {
+		if (MagCal_Run()) {
+			last_cal_time = current_time;
+		}
+	}
 }
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
@@ -519,9 +542,17 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			gyroY = (int16_t) ((gyro_buffer[3] << 8) | gyro_buffer[2]);
 			gyroZ = (int16_t) ((gyro_buffer[5] << 8) | gyro_buffer[4]);
 
-			gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS / 1000.0f;
-			gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS / 1000.0f;
-			gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS / 1000.0f - 4.6;
+//			gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS / 1000.0f;
+//			gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS / 1000.0f;
+//			gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS / 1000.0f - 4.6;
+
+//			gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS * DEG2RAD / 1000.0f;
+//			gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS * DEG2RAD / 1000.0f;
+//			gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS * DEG2RAD / 1000.0f;
+
+			gyroX_current = gyroX * (245.0f * (M_PI/180.0f) / 32768.0f);  // rad/s
+			gyroY_current = gyroY * (245.0f * (M_PI/180.0f) / 32768.0f);  // rad/s
+			gyroZ_current = gyroZ * (245.0f * (M_PI/180.0f) / 32768.0f);  // rad/s
 
 			if (DAM_Callback_cnt < 1000) {
 				gyroX_sum += gyroX_current;
@@ -540,6 +571,10 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 				gxyz[1] = gy1;
 				gxyz[2] = gz1;
 
+//				gxyz[0] = gyro_x;
+//				gxyz[1] = gyro_y;
+//				gxyz[2] = gyro_z;
+
 				CurrentSensor = ACCEL_SENSOR;
 				LSM9DS1_ReadAccel_DMA();
 			}
@@ -549,9 +584,17 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			accelY = (int16_t) ((accel_buffer[3] << 8) | accel_buffer[2]);
 			accelZ = (int16_t) ((accel_buffer[5] << 8) | accel_buffer[4]);
 
-			accel_x = accelX * ACCEL_SENSITIVITY_2G / 100000;
-			accel_y = accelY * ACCEL_SENSITIVITY_2G / 100000;
-			accel_z = accelZ * ACCEL_SENSITIVITY_2G / 100000;
+//			accel_x = accelX * ACCEL_SENSITIVITY_2G * 0.001f;
+//			accel_y = accelY * ACCEL_SENSITIVITY_2G * 0.001f;
+//			accel_z = accelZ * ACCEL_SENSITIVITY_2G * 0.001f;
+
+			accel_x = accelX * (2.0f * 9.81f / 32768.0f);  // 2G = 2 * 9.81 m/s², 16비트 = 32768
+			accel_y = accelY * (2.0f * 9.81f / 32768.0f);
+			accel_z = accelZ * (2.0f * 9.81f / 32768.0f);
+
+//			accel_x = accel_x / 9.8f;
+//			accel_y = accel_y / 9.8f;
+//			accel_z = accel_z / 9.8f;
 
 			axyz[0] = accel_x;
 			axyz[1] = accel_y;
@@ -561,9 +604,9 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			axyz2[1] = axyz[1];
 			axyz2[2] = axyz[2];
 
-			axyz[0] = axyz[0] * 1 / 9.8;
-			axyz[1] = axyz[1] * 1 / 9.8;
-			axyz[2] = axyz[2] * 1 / 9.8;
+//			axyz[0] = axyz[0] * 1 / 9.8;
+//			axyz[1] = axyz[1] * 1 / 9.8;
+//			axyz[2] = axyz[2] * 1 / 9.8;
 
 			vector_normalize(axyz);
 
@@ -575,69 +618,96 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			magY = (int16_t) ((mag_buffer[3] << 8) | mag_buffer[2]);
 			magZ = (int16_t) ((mag_buffer[5] << 8) | mag_buffer[4]);
 
-			if (magcal_flag == 1) {
-				//magcal algorithm
-				process_imu_data(magX, magY, magZ);
+//			mag_x = magX * MAG_SENSITIVITY_4GAUSS * 0.1f;
+//			mag_y = magY * MAG_SENSITIVITY_4GAUSS * 0.1f;
+//			mag_z = magZ * MAG_SENSITIVITY_4GAUSS * 0.1f;
 
-				MagCal_Run();
+			mag_x = magX * (4.0f / 32768.0f);  // uT
+			mag_y = magY * (4.0f / 32768.0f);  // uT
+			mag_z = magZ * (4.0f / 32768.0f);  // uT
 
-				for (i=0; i < MAGBUFFSIZE; i++) {
-					if (magcal.valid[i]) {
+			mx1 = mag_x - hardIron_x;
+			my1 = mag_y - hardIron_y;
+			mz1 = mag_z - hardIron_z;
 
-						apply_calibration(magcal.BpFast[0][i], magcal.BpFast[1][i],
-											magcal.BpFast[2][i], &point);
-						quality_update(&point);
+			float corrected_V[] = { mx1, my1, mz1 };
 
-						if(magcal.FitError < 2.0)
-						{
-							magcal_flag = 0;
-						}
-					}
-				}
+			result_V[0] = corrected_V[0] * softIron_cali[0][0]
+					+ corrected_V[1] * softIron_cali[0][1]
+					+ corrected_V[2] * softIron_cali[0][2];
+			result_V[1] = corrected_V[0] * softIron_cali[1][0]
+					+ corrected_V[1] * softIron_cali[1][1]
+					+ corrected_V[2] * softIron_cali[1][2];
+			result_V[2] = corrected_V[0] * softIron_cali[2][0]
+					+ corrected_V[1] * softIron_cali[2][1]
+					+ corrected_V[2] * softIron_cali[2][2];
 
-			} else {
-				mag_x = magX * MAG_SENSITIVITY_4GAUSS / 1000;
-				mag_y = magY * MAG_SENSITIVITY_4GAUSS / 1000;
-				mag_z = magZ * MAG_SENSITIVITY_4GAUSS / 1000;
+			mx2 = result_V[0];
+			my2 = result_V[1];
+			mz2 = result_V[2];
+			mxyz[0] = mx2;
+			mxyz[1] = my2;
+			mxyz[2] = mz2;
 
-				mx1 = mag_x - hardIron_x;
-				my1 = mag_y - hardIron_y;
-				mz1 = mag_z - hardIron_z;
+			vector_normalize(mxyz);
 
-				float corrected_V[] = { mx1, my1, mz1 };
+			axyz1[0] = -axyz[0];
+			gxyz1[0] = -gxyz[0];
 
-				result_V[0] = corrected_V[0] * softIron_cali[0][0]
-						+ corrected_V[1] * softIron_cali[0][1]
-						+ corrected_V[2] * softIron_cali[0][2];
-				result_V[1] = corrected_V[0] * softIron_cali[1][0]
-						+ corrected_V[1] * softIron_cali[1][1]
-						+ corrected_V[2] * softIron_cali[1][2];
-				result_V[2] = corrected_V[0] * softIron_cali[2][0]
-						+ corrected_V[1] * softIron_cali[2][1]
-						+ corrected_V[2] * softIron_cali[2][2];
+			Now = micros();
+			deltat = (Now - lastUpdate) * 1.5e-4;
+			lastUpdate = Now;
 
-				mx2 = result_V[0];
-				my2 = result_V[1];
-				mz2 = result_V[2];
-				mxyz[0] = mx2;
-				mxyz[1] = my2;
-				mxyz[2] = mz2;
-
-				vector_normalize(mxyz);
-
-				axyz1[0] = -axyz[0];
-				gxyz1[0] = -gxyz[0];
-
-				Now = micros();
-				deltat = (Now - lastUpdate) * 1.5e-4;
-				lastUpdate = Now;
-
-				MadgwickAHRSupdate(gxyz1[0], gxyz[1], gxyz[2], axyz1[0],
-						axyz[1], axyz[2], mxyz[0], mxyz[1], mxyz[2]);
-				UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_BLE, CFG_SCH_PRIO_0);
-			}
+			MadgwickAHRSupdate(gxyz1[0], gxyz[1], gxyz[2], axyz1[0], axyz[1],
+					axyz[2], mxyz[0], mxyz[1], mxyz[2]);
+			UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_BLE, CFG_SCH_PRIO_0);
 
 			CurrentSensor = GYRO_SENSOR;
+
+		} else if (CurrentSensor = MAG_SENSOR_CAL) {
+
+			magX = (int16_t) ((mag_buffer[1] << 8) | mag_buffer[0]);
+			magY = (int16_t) ((mag_buffer[3] << 8) | mag_buffer[2]);
+			magZ = (int16_t) ((mag_buffer[5] << 8) | mag_buffer[4]);
+
+			mag_x = magX * MAG_SENSITIVITY_4GAUSS;
+			mag_y = magY * MAG_SENSITIVITY_4GAUSS;
+			mag_z = magZ * MAG_SENSITIVITY_4GAUSS;
+
+			//magcal algorithm
+			process_imu_data(mag_x, mag_y, mag_z);
+			magcal_counter++;
+
+//			if (magcal_counter >= 20) {
+//				MagCal_Run();
+//				magcal_counter = 0;
+//			}
+
+			for (i = 0; i < MAGBUFFSIZE; i++) {
+				if (magcal.valid[i]) {
+
+					apply_calibration(magcal.BpFast[0][i], magcal.BpFast[1][i],
+							magcal.BpFast[2][i], &point);
+					quality_update(&point);
+				}
+			}
+
+			if (gaps <= 1.2 && magcal.FitError < 2.1) {
+
+				hardIron_x = magcal.V[0];
+				hardIron_y = magcal.V[1];
+				hardIron_z = magcal.V[2];
+
+				for (int i = 0; i < 3; i++) {
+					for (int j = 0; j < 3; j++) {
+						softIron_cali[i][j] = magcal.invW[i][j];
+					}
+				}
+				CurrentSensor = GYRO_SENSOR;
+				LSM9DS1_ReadGyro_DMA();
+			} else {
+				LSM9DS1_ReadMag_DMA();
+			}
 		}
 	}
 }
@@ -710,7 +780,11 @@ int main(void) {
 		/* USER CODE BEGIN 3 */
 
 		//low_power_code
-		LSM9DS1_ReadGyro_DMA();
+		if (CurrentSensor == MAG_SENSOR_CAL) {
+			LSM9DS1_ReadMag_DMA();
+		} else {
+			LSM9DS1_ReadGyro_DMA();
+		}
 
 	}
 	/* USER CODE END 3 */

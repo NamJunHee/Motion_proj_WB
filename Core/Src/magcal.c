@@ -27,92 +27,91 @@ static void fUpdateCalibration10EIG(MagCalibration_t *MagCal);
 int magcal_type = 0;
 int magcal_cnt = 0;
 
-int MagCal_Run(void)
-{
+int MagCal_Run(void) {
 	int i, j;			// loop counters
 	int isolver;		// magnetic solver used
-	int count=0;
-	static int waitcount=0;
+	int count = 0;
+	static int waitcount = 0;
 
 	// only do the calibration occasionally
-	if (++waitcount < 5) return 0;
-	waitcount = 0;
+//	if (++waitcount < 20) return 0;
+//	waitcount = 0;
 
 	// count number of data points
-	for (i=0; i < MAGBUFFSIZE; i++) {
-		if (magcal.valid[i]) count++;
+	for (i = 0; i < MAGBUFFSIZE; i++) {
+		if (magcal.valid[i])
+			count++;
 	}
 
 	magcal_cnt = count;
 
-	if (count < MINMEASUREMENTS4CAL) return 0;
+	if (count < MINMEASUREMENTS4CAL)
+		return 0;
 
 	if (magcal.ValidMagCal) {
 		// age the existing fit error to avoid one good calibration locking out future updates
 		magcal.FitErrorAge *= 1.02f;
 	}
 
-	if (count < MINMEASUREMENTS7CAL)
-	{
+	if (count < MINMEASUREMENTS7CAL) {
 		isolver = 4;
 		fUpdateCalibration4INV(&magcal); // 4 element matrix inversion calibration
-		if (magcal.trFitErrorpc < 12.0f) magcal.trFitErrorpc = 12.0f;
-	}
-	else if (count < MINMEASUREMENTS10CAL)
-	{
+		if (magcal.trFitErrorpc < 12.0f)
+			magcal.trFitErrorpc = 12.0f;
+	} else if (count < MINMEASUREMENTS10CAL) {
 		isolver = 7;
 		fUpdateCalibration7EIG(&magcal); // 7 element eigenpair calibration
-		if (magcal.trFitErrorpc < 7.5f) magcal.trFitErrorpc = 7.5f;
-	}
-	else
-	{
+		if (magcal.trFitErrorpc < 7.5f)
+			magcal.trFitErrorpc = 7.5f;
+	} else {
 		isolver = 10;
 		fUpdateCalibration10EIG(&magcal); // 10 element eigenpair calibration
 	}
 
 	// the trial geomagnetic field must be in range (earth is 22uT to 67uT)
-	if ((magcal.trB >= MINBFITUT) && (magcal.trB <= MAXBFITUT))
-	{
-			// always accept the calibration if
-			//  1: no previous calibration exists
-			//  2: the calibration fit is reduced or
-			//  3: an improved solver was used giving a good trial calibration (4% or under)
-		if ((magcal.ValidMagCal == 0) ||(magcal.trFitErrorpc <= magcal.FitErrorAge) ||((isolver > magcal.ValidMagCal) && (magcal.trFitErrorpc <= 4.0F)))
-		{
-				// accept the new calibration solution
-				//printf("new magnetic cal, B=%.2f uT\n", magcal.trB);
+	if ((magcal.trB >= MINBFITUT) && (magcal.trB <= MAXBFITUT)) {
+		// always accept the calibration if
+		//  1: no previous calibration exists
+		//  2: the calibration fit is reduced or
+		//  3: an improved solver was used giving a good trial calibration (4% or under)
+		if ((magcal.ValidMagCal == 0)
+				|| (magcal.trFitErrorpc <= magcal.FitErrorAge)
+				|| ((isolver > magcal.ValidMagCal)
+						&& (magcal.trFitErrorpc <= 4.0F))) {
+			// accept the new calibration solution
+			//printf("new magnetic cal, B=%.2f uT\n", magcal.trB);
 			magcal.ValidMagCal = isolver;
 			magcal.FitError = magcal.trFitErrorpc;
-			if (magcal.trFitErrorpc > 2.0f)
-			{
+			if (magcal.trFitErrorpc > 2.0f) {
 				magcal.FitErrorAge = magcal.trFitErrorpc;
-			}
-			else
-			{
+			} else {
 				magcal.FitErrorAge = 2.0f;
 			}
 			magcal.B = magcal.trB;
 			magcal.FourBsq = 4.0F * magcal.trB * magcal.trB;
-			for (i = X; i <= Z; i++) {
-				magcal.V[i] = magcal.trV[i];
-				for (j = X; j <= Z; j++) {
-					magcal.invW[i][j] = magcal.trinvW[i][j];
+			if (fabs(magcal.trV[X]) <= 50.0f && fabs(magcal.trV[Y]) <= 50.0f
+					&& fabs(magcal.trV[Z]) <= 50.0f) {
+				for (i = X; i <= Z; i++) {
+					magcal.V[i] = magcal.trV[i];
+					for (j = X; j <= Z; j++) {
+						magcal.invW[i][j] = magcal.trinvW[i][j];
+					}
 				}
+				return 1; // indicates new calibration applied
 			}
-			return 1; // indicates new calibration applied
+
 		}
 	}
 
 	return 0;
 }
 
-static void fUpdateCalibration4INV(MagCalibration_t *MagCal)
-{
+static void fUpdateCalibration4INV(MagCalibration_t *MagCal) {
 	float fBp2;					// fBp[X]^2+fBp[Y]^2+fBp[Z]^2
 	float fSumBp4;				// sum of fBp2
 	float fscaling;				// set to FUTPERCOUNT * FMATRIXSCALING
 	float fE;					// error function = r^T.r
-	int16_t iOffset[3];			// offset to remove large DC hard iron bias in matrix
+	int16_t iOffset[3];	// offset to remove large DC hard iron bias in matrix
 	int16_t iCount;				// number of measurements counted
 	int i, j, k;				// loop counters
 
@@ -156,8 +155,8 @@ static void fUpdateCalibration4INV(MagCalibration_t *MagCal)
 
 			// store scaled and offset fBp[XYZ] in vecA[0-2] and fBp[XYZ]^2 in vecA[3-5]
 			for (k = X; k <= Z; k++) {
-				MagCal->vecA[k] = (float)((int32_t)MagCal->BpFast[k][j]
-					- (int32_t)iOffset[k]) * fscaling;
+				MagCal->vecA[k] = (float) ((int32_t) MagCal->BpFast[k][j]
+						- (int32_t) iOffset[k]) * fscaling;
 				MagCal->vecA[k + 3] = MagCal->vecA[k] * MagCal->vecA[k];
 			}
 
@@ -200,8 +199,8 @@ static void fUpdateCalibration4INV(MagCalibration_t *MagCal)
 	// use above diagonal elements of symmetric matA to set both matB and matA to X^T.X
 	for (i = 0; i < 4; i++) {
 		for (j = i; j < 4; j++) {
-			MagCal->matB[i][j] = MagCal->matB[j][i]
-				= MagCal->matA[j][i] = MagCal->matA[i][j];
+			MagCal->matB[i][j] = MagCal->matB[j][i] = MagCal->matA[j][i] =
+					MagCal->matA[i][j];
 		}
 	}
 
@@ -247,18 +246,20 @@ static void fUpdateCalibration4INV(MagCalibration_t *MagCal)
 	}
 
 	// compute the scaled geomagnetic field strength B (in uT but scaled by FMATRIXSCALING)
-	MagCal->trB = sqrtf(MagCal->vecA[3] + MagCal->trV[X] * MagCal->trV[X] +
-			MagCal->trV[Y] * MagCal->trV[Y] + MagCal->trV[Z] * MagCal->trV[Z]);
+	MagCal->trB = sqrtf(
+			MagCal->vecA[3] + MagCal->trV[X] * MagCal->trV[X]
+					+ MagCal->trV[Y] * MagCal->trV[Y]
+					+ MagCal->trV[Z] * MagCal->trV[Z]);
 
 	// calculate the trial fit error (percent) normalized to number of measurements
 	// and scaled geomagnetic field strength
-	MagCal->trFitErrorpc = sqrtf(fE / (float) MagCal->MagBufferCount) * 100.0F /
-			(2.0F * MagCal->trB * MagCal->trB);
+	MagCal->trFitErrorpc = sqrtf(fE / (float) MagCal->MagBufferCount) * 100.0F
+			/ (2.0F * MagCal->trB * MagCal->trB);
 
 	// correct the hard iron estimate for FMATRIXSCALING and the offsets applied (result in uT)
 	for (k = X; k <= Z; k++) {
 		MagCal->trV[k] = MagCal->trV[k] * DEFAULTB
-			+ (float)iOffset[k] * FXOS8700_UTPERCOUNT;
+				+ (float) iOffset[k] * FXOS8700_UTPERCOUNT;
 	}
 
 	// correct the geomagnetic field strength B to correct scaling (result in uT)
@@ -266,8 +267,7 @@ static void fUpdateCalibration4INV(MagCalibration_t *MagCal)
 
 }
 
-static void fUpdateCalibration7EIG(MagCalibration_t *MagCal)
-{
+static void fUpdateCalibration7EIG(MagCalibration_t *MagCal) {
 	float det;					// matrix determinant
 	float fscaling;				// set to FUTPERCOUNT * FMATRIXSCALING
 	float ftmp;					// scratch variable
@@ -303,8 +303,8 @@ static void fUpdateCalibration7EIG(MagCalibration_t *MagCal)
 
 			// apply the offset and scaling and store in vecA
 			for (k = X; k <= Z; k++) {
-				MagCal->vecA[k + 3] = (float)((int32_t)MagCal->BpFast[k][j]
-					- (int32_t)iOffset[k]) * fscaling;
+				MagCal->vecA[k + 3] = (float) ((int32_t) MagCal->BpFast[k][j]
+						- (int32_t) iOffset[k]) * fscaling;
 				MagCal->vecA[k] = MagCal->vecA[k + 3] * MagCal->vecA[k + 3];
 			}
 
@@ -377,8 +377,9 @@ static void fUpdateCalibration7EIG(MagCalibration_t *MagCal)
 	}
 
 	// calculate the trial normalized fit error as a percentage
-	MagCal->trFitErrorpc = 50.0F *
-		sqrtf(fabs(MagCal->vecA[j]) / (float) MagCal->MagBufferCount) / fabs(ftmp);
+	MagCal->trFitErrorpc = 50.0F
+			* sqrtf(fabs(MagCal->vecA[j]) / (float) MagCal->MagBufferCount)
+			/ fabs(ftmp);
 
 	// normalize the ellipsoid matrix A to unit determinant
 	f3x3matrixAeqAxScalar(MagCal->A, powf(det, -(ONETHIRD)));
@@ -392,16 +393,16 @@ static void fUpdateCalibration7EIG(MagCalibration_t *MagCal)
 	f3x3matrixAeqI(MagCal->trinvW);
 	for (k = X; k <= Z; k++) {
 		MagCal->trinvW[k][k] = sqrtf(fabs(MagCal->A[k][k]));
-		MagCal->trV[k] = MagCal->trV[k] * DEFAULTB + (float)iOffset[k] * FXOS8700_UTPERCOUNT;
+		MagCal->trV[k] = MagCal->trV[k] * DEFAULTB
+				+ (float) iOffset[k] * FXOS8700_UTPERCOUNT;
 	}
 }
 
-static void fUpdateCalibration10EIG(MagCalibration_t *MagCal)
-{
+static void fUpdateCalibration10EIG(MagCalibration_t *MagCal) {
 	float det;					// matrix determinant
 	float fscaling;				// set to FUTPERCOUNT * FMATRIXSCALING
 	float ftmp;					// scratch variable
-	int16_t iOffset[3];			// offset to remove large DC hard iron bias in matrix
+	int16_t iOffset[3];	// offset to remove large DC hard iron bias in matrix
 	int16_t iCount;				// number of measurements counted
 	int i, j, k, m, n;			// loop counters
 
@@ -434,8 +435,8 @@ static void fUpdateCalibration10EIG(MagCalibration_t *MagCal)
 
 			// apply the fixed offset and scaling and enter into vecA[6-8]
 			for (k = X; k <= Z; k++) {
-				MagCal->vecA[k + 6] = (float)((int32_t)MagCal->BpFast[k][j]
-					- (int32_t)iOffset[k]) * fscaling;
+				MagCal->vecA[k + 6] = (float) ((int32_t) MagCal->BpFast[k][j]
+						- (int32_t) iOffset[k]) * fscaling;
 			}
 
 			// compute measurement vector elements vecA[0-5] from vecA[6-8]
@@ -520,22 +521,29 @@ static void fUpdateCalibration10EIG(MagCalibration_t *MagCal)
 	}
 
 	// compute the trial geomagnetic field strength B in bit counts times FMATRIXSCALING
-	MagCal->trB = sqrtf(fabs(MagCal->A[0][0] * MagCal->trV[X] * MagCal->trV[X] +
-			2.0F * MagCal->A[0][1] * MagCal->trV[X] * MagCal->trV[Y] +
-			2.0F * MagCal->A[0][2] * MagCal->trV[X] * MagCal->trV[Z] +
-			MagCal->A[1][1] * MagCal->trV[Y] * MagCal->trV[Y] +
-			2.0F * MagCal->A[1][2] * MagCal->trV[Y] * MagCal->trV[Z] +
-			MagCal->A[2][2] * MagCal->trV[Z] * MagCal->trV[Z] - MagCal->matB[9][j]));
+	MagCal->trB = sqrtf(
+			fabs(
+					MagCal->A[0][0] * MagCal->trV[X] * MagCal->trV[X]
+							+ 2.0F * MagCal->A[0][1] * MagCal->trV[X]
+									* MagCal->trV[Y]
+							+ 2.0F * MagCal->A[0][2] * MagCal->trV[X]
+									* MagCal->trV[Z]
+							+ MagCal->A[1][1] * MagCal->trV[Y] * MagCal->trV[Y]
+							+ 2.0F * MagCal->A[1][2] * MagCal->trV[Y]
+									* MagCal->trV[Z]
+							+ MagCal->A[2][2] * MagCal->trV[Z] * MagCal->trV[Z]
+							- MagCal->matB[9][j]));
 
 	// calculate the trial normalized fit error as a percentage
-	MagCal->trFitErrorpc = 50.0F * sqrtf(
-		fabs(MagCal->vecA[j]) / (float) MagCal->MagBufferCount) /
-		(MagCal->trB * MagCal->trB);
+	MagCal->trFitErrorpc = 50.0F
+			* sqrtf(fabs(MagCal->vecA[j]) / (float) MagCal->MagBufferCount)
+			/ (MagCal->trB * MagCal->trB);
 
 	// correct for the measurement matrix offset and scaling and
 	// get the computed hard iron offset in uT
 	for (k = X; k <= Z; k++) {
-		MagCal->trV[k] = MagCal->trV[k] * DEFAULTB + (float)iOffset[k] * FXOS8700_UTPERCOUNT;
+		MagCal->trV[k] = MagCal->trV[k] * DEFAULTB
+				+ (float) iOffset[k] * FXOS8700_UTPERCOUNT;
 	}
 
 	// convert the trial geomagnetic field strength B into uT for
@@ -582,5 +590,4 @@ static void fUpdateCalibration10EIG(MagCalibration_t *MagCal)
 		}
 	}
 }
-
 

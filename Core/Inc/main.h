@@ -74,7 +74,8 @@ extern volatile float q0, q1, q2, q3;
 typedef enum{
 	GYRO_SENSOR,
 	ACCEL_SENSOR,
-	MAG_SENSOR
+	MAG_SENSOR,
+	MAG_SENSOR_CAL
 }SensorType;
 
 extern SensorType CurrentSensor;
@@ -169,7 +170,7 @@ extern int magcal_type;
 #define OUT_Z_L_G    0x1C
 #define OUT_Z_H_G    0x1D
 
-#define ACCEL_SENSITIVITY_2G 61.0f
+#define ACCEL_SENSITIVITY_2G 0.061f
 #define MAG_SENSITIVITY_4GAUSS 0.14f
 #define GYRO_SENSITIVITY_245DPS 8.75f
 

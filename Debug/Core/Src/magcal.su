@@ -1,4 +1,4 @@
 ../Core/Src/magcal.c:30:5:MagCal_Run	24	static
 ../Core/Src/magcal.c:109:13:fUpdateCalibration4INV	104	static
-../Core/Src/magcal.c:269:13:fUpdateCalibration7EIG	80	static
-../Core/Src/magcal.c:399:13:fUpdateCalibration10EIG	72	static
+../Core/Src/magcal.c:270:13:fUpdateCalibration7EIG	80	static
+../Core/Src/magcal.c:401:13:fUpdateCalibration10EIG	72	static
