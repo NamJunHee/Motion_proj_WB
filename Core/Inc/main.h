@@ -52,7 +52,7 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
-#define MAGBUFFSIZE 650 // Freescale's lib needs at least 392
+#define MAGBUFFSIZE 600 // Freescale's lib needs at least 392
 
 extern uint8_t magcal_flag;
 
@@ -172,7 +172,8 @@ extern int magcal_type;
 
 #define ACCEL_SENSITIVITY_2G 0.061f
 #define MAG_SENSITIVITY_4GAUSS 0.14f
-#define GYRO_SENSITIVITY_245DPS 8.75f
+//#define GYRO_SENSITIVITY_245DPS 8.75f
+#define GYRO_SENSITIVITY_245DPS 0.00875f
 
 #define betaDef 0.5f
 

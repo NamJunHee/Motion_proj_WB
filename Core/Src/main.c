@@ -106,21 +106,21 @@ uint32_t micro_time = 0;
 uint32_t Now = 0;
 
 float gxyz[3], gxyz1[3], axyz[3], axyz1[3], mxyz[3], axyz2[3];
-float result_V[3];
+//float result_V[3];
 
 //float hardIron_x = -14.73;
 //float hardIron_y = -33.35;
 //float hardIron_z = 0.49;
 
-float hardIron_x = 4.47;
-float hardIron_y = 49.71;
-float hardIron_z = 16.24;
+float hardIron_x = 1.15;
+float hardIron_y = 11.99;
+float hardIron_z = -11.75;
 
 //float softIron_cali[3][3] = { { 1.001, 0.033, -0.006 }, { 0.033, 0.968, 0.000 },
 //		{ -0.006, -0.000, 1.033 } };
 
-float softIron_cali[3][3] = { { 1.601, 0.112, 0.209 }, { 0.112, 0.701, -0.154 },
-		{ 0.209, -0.154, 0.968 } };
+float softIron_cali[3][3] = { { 0.944,0.004, -0.001 }, { 0.004, 1.058, -0.027 },
+		{ -0.002, -0.026, 1.000 } };
 
 uint8_t magcal_flag = 1;
 static int magcal_counter = 0;
@@ -534,7 +534,7 @@ void process_imu_data(int16_t raw_magX, int16_t raw_magY, int16_t raw_magZ) {
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 
-	DAM_Callback_cnt++;
+//	DAM_Callback_cnt++;
 
 	if (hi2c->Instance == I2C1) {
 		if (CurrentSensor == GYRO_SENSOR) {
@@ -542,23 +542,34 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			gyroY = (int16_t) ((gyro_buffer[3] << 8) | gyro_buffer[2]);
 			gyroZ = (int16_t) ((gyro_buffer[5] << 8) | gyro_buffer[4]);
 
-//			gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS / 1000.0f;
-//			gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS / 1000.0f;
-//			gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS / 1000.0f - 4.6;
+			gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS * DEG2RAD;
+			gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS * DEG2RAD;
+			gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS * DEG2RAD;
 
 //			gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS * DEG2RAD / 1000.0f;
 //			gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS * DEG2RAD / 1000.0f;
 //			gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS * DEG2RAD / 1000.0f;
 
-			gyroX_current = gyroX * (245.0f * (M_PI/180.0f) / 32768.0f);  // rad/s
-			gyroY_current = gyroY * (245.0f * (M_PI/180.0f) / 32768.0f);  // rad/s
-			gyroZ_current = gyroZ * (245.0f * (M_PI/180.0f) / 32768.0f);  // rad/s
+//			gyroX_current = gyroX * (245.0f * (M_PI / 180.0f) / 32768.0f); // rad/s
+//			gyroY_current = gyroY * (245.0f * (M_PI / 180.0f) / 32768.0f); // rad/s
+//			gyroZ_current = gyroZ * (245.0f * (M_PI / 180.0f) / 32768.0f); // rad/s
+
+//			gyroX_current = gyroX * GYRO_SENSITIVITY_245DPS ;
+//			gyroY_current = gyroY * GYRO_SENSITIVITY_245DPS ;
+//			gyroZ_current = gyroZ * GYRO_SENSITIVITY_245DPS ;
 
 			if (DAM_Callback_cnt < 1000) {
+
 				gyroX_sum += gyroX_current;
 				gyroY_sum += gyroY_current;
 				gyroZ_sum += gyroZ_current;
+
+				DAM_Callback_cnt++;
+
 			} else {
+
+				DAM_Callback_cnt = 10000;
+
 				gyroX_avg = gyroX_sum / 1000.0f;
 				gyroY_avg = gyroY_sum / 1000.0f;
 				gyroZ_avg = gyroZ_sum / 1000.0f;
@@ -567,13 +578,9 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 				gyro_y = gyroY_current - gyroY_avg;
 				gyro_z = gyroZ_current - gyroZ_avg;
 
-				gxyz[0] = gx1;
-				gxyz[1] = gy1;
-				gxyz[2] = gz1;
-
-//				gxyz[0] = gyro_x;
-//				gxyz[1] = gyro_y;
-//				gxyz[2] = gyro_z;
+				gxyz[0] = gyro_x;
+				gxyz[1] = gyro_y;
+				gxyz[2] = gyro_z;
 
 				CurrentSensor = ACCEL_SENSOR;
 				LSM9DS1_ReadAccel_DMA();
@@ -588,13 +595,9 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 //			accel_y = accelY * ACCEL_SENSITIVITY_2G * 0.001f;
 //			accel_z = accelZ * ACCEL_SENSITIVITY_2G * 0.001f;
 
-			accel_x = accelX * (2.0f * 9.81f / 32768.0f);  // 2G = 2 * 9.81 m/s², 16비트 = 32768
+			accel_x = accelX * (2.0f * 9.81f / 32768.0f); // 2G = 2 * 9.81 m/s², 16비트 = 32768
 			accel_y = accelY * (2.0f * 9.81f / 32768.0f);
 			accel_z = accelZ * (2.0f * 9.81f / 32768.0f);
-
-//			accel_x = accel_x / 9.8f;
-//			accel_y = accel_y / 9.8f;
-//			accel_z = accel_z / 9.8f;
 
 			axyz[0] = accel_x;
 			axyz[1] = accel_y;
@@ -604,9 +607,9 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			axyz2[1] = axyz[1];
 			axyz2[2] = axyz[2];
 
-//			axyz[0] = axyz[0] * 1 / 9.8;
-//			axyz[1] = axyz[1] * 1 / 9.8;
-//			axyz[2] = axyz[2] * 1 / 9.8;
+			axyz[0] = axyz[0] * 1 / 9.8;
+			axyz[1] = axyz[1] * 1 / 9.8;
+			axyz[2] = axyz[2] * 1 / 9.8;
 
 			vector_normalize(axyz);
 
@@ -622,15 +625,16 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 //			mag_y = magY * MAG_SENSITIVITY_4GAUSS * 0.1f;
 //			mag_z = magZ * MAG_SENSITIVITY_4GAUSS * 0.1f;
 
-			mag_x = magX * (4.0f / 32768.0f);  // uT
-			mag_y = magY * (4.0f / 32768.0f);  // uT
-			mag_z = magZ * (4.0f / 32768.0f);  // uT
+			mag_x = magX * (4.0f / 32768.0f) * 100;  // uT
+			mag_y = magY * (4.0f / 32768.0f) * 100;  // uT
+			mag_z = magZ * (4.0f / 32768.0f) * 100;  // uT
 
 			mx1 = mag_x - hardIron_x;
 			my1 = mag_y - hardIron_y;
 			mz1 = mag_z - hardIron_z;
 
 			float corrected_V[] = { mx1, my1, mz1 };
+			float result_V[3];
 
 			result_V[0] = corrected_V[0] * softIron_cali[0][0]
 					+ corrected_V[1] * softIron_cali[0][1]
@@ -645,6 +649,7 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			mx2 = result_V[0];
 			my2 = result_V[1];
 			mz2 = result_V[2];
+
 			mxyz[0] = mx2;
 			mxyz[1] = my2;
 			mxyz[2] = mz2;
@@ -655,16 +660,18 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			gxyz1[0] = -gxyz[0];
 
 			Now = micros();
-			deltat = (Now - lastUpdate) * 1.5e-4;
+			deltat = (Now - lastUpdate) * 1.0e-6 * 5.0f;;
 			lastUpdate = Now;
 
 			MadgwickAHRSupdate(gxyz1[0], gxyz[1], gxyz[2], axyz1[0], axyz[1],
 					axyz[2], mxyz[0], mxyz[1], mxyz[2]);
-			UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_BLE, CFG_SCH_PRIO_0);
 
+			UTIL_SEQ_SetTask(1 << CFG_TASK_MY_TASK_BLE, CFG_SCH_PRIO_0);
 			CurrentSensor = GYRO_SENSOR;
 
 		} else if (CurrentSensor = MAG_SENSOR_CAL) {
+
+			DAM_Callback_cnt = 0;
 
 			magX = (int16_t) ((mag_buffer[1] << 8) | mag_buffer[0]);
 			magY = (int16_t) ((mag_buffer[3] << 8) | mag_buffer[2]);
