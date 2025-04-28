@@ -80,7 +80,7 @@ float mag_x = 0;
 float mag_y = 0;
 float mag_z = 0;
 
-SensorType CurrentSensor = GYRO_SENSOR;
+SensorType CurrentSensor = MAG_SENSOR_CAL;
 
 int DAM_Callback_cnt = 0;
 
@@ -141,6 +141,8 @@ float gaps = 99, field, error, errormax;
 
 int choose_flag = 0;
 const double DEG2RAD = M_PI / 180.0;
+
+uint32_t waitcount  = 0;
 
 /* USER CODE END PV */
 
@@ -514,6 +516,32 @@ static void add_magcal_data(const int16_t *data) {
 	magcal.valid[i] = 1;
 }
 
+bool is_mag_moving(float magX, float magY, float magZ) {
+    static float prevX = 0.0f, prevY = 0.0f, prevZ = 0.0f;
+    static int initialized = 0;
+
+    if (!initialized) {
+        prevX = magX;
+        prevY = magY;
+        prevZ = magZ;
+        initialized = 1;
+        return true;  // 초기에는 무조건 움직인 것으로 간주
+    }
+
+    float deltaX = magX - prevX;
+    float deltaY = magY - prevY;
+    float deltaZ = magZ - prevZ;
+
+    float deltaMag = sqrtf(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+
+    // 현재 값을 저장
+    prevX = magX;
+    prevY = magY;
+    prevZ = magZ;
+
+    return deltaMag > MAG_MOVEMENT_THRESHOLD;
+}
+
 void process_imu_data(int16_t raw_magX, int16_t raw_magY, int16_t raw_magZ) {
 	mag_raw[0] = raw_magX;
 	mag_raw[1] = raw_magY;
@@ -521,14 +549,12 @@ void process_imu_data(int16_t raw_magX, int16_t raw_magY, int16_t raw_magZ) {
 
 	add_magcal_data(mag_raw);
 
-	// 즉시 calibration 시도
-	static uint32_t last_cal_time = 0;
-	uint32_t current_time = HAL_GetTick();
+	waitcount++;
 
-	if (current_time - last_cal_time >= 50) {
-		if (MagCal_Run()) {
-			last_cal_time = current_time;
-		}
+	if (waitcount >= 5) {
+	    if (MagCal_Run()) {
+	    }
+	    waitcount = 0;
 	}
 }
 
@@ -683,7 +709,7 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 
 			//magcal algorithm
 			process_imu_data(mag_x, mag_y, mag_z);
-			magcal_counter++;
+//			magcal_counter++;
 
 //			if (magcal_counter >= 20) {
 //				MagCal_Run();

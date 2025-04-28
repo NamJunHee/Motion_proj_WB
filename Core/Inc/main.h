@@ -43,6 +43,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -52,7 +53,8 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
-#define MAGBUFFSIZE 600 // Freescale's lib needs at least 392
+#define MAGBUFFSIZE 400 // Freescale's lib needs at least 392
+#define MAG_MOVEMENT_THRESHOLD 0.5f  // uT 단위, 적절히 조정 가능
 
 extern uint8_t magcal_flag;
 
